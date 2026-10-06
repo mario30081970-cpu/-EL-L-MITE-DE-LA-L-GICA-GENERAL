@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador ASIC · Hardware III</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --bg:#070b10; --panel:#0f1720; --line:#1e2b38;
+    --cyan:#22d3ee; --green:#34d399;
+  }
+  *{ -webkit-tap-highlight-color: transparent; box-sizing:border-box; }
+  html,body{ background:var(--bg); color:#e2e8f0; margin:0; }
+  body{
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(34,211,238,.10), transparent 45%),
+      radial-gradient(circle at 90% 100%, rgba(52,211,153,.08), transparent 45%),
+      linear-gradient(rgba(30,43,56,.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30,43,56,.35) 1px, transparent 1px);
+    background-size: auto, auto, 28px 28px, 28px 28px;
+    background-attachment: fixed;
+  }
+  .pantalla{ display:none; }
+  .pantalla.activa{ display:block; animation: fade .28s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
+
+  .card{
+    background:linear-gradient(180deg,#101a24,#0b131b);
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:0 6px 22px rgba(0,0,0,.35);
+  }
+  .tag{
+    display:inline-block; font-size:11px; font-weight:800; letter-spacing:.12em;
+    color:#06202a; background:linear-gradient(90deg,#22d3ee,#34d399);
+    padding:4px 10px; border-radius:999px;
+  }
+  .lbl{ display:block; font-size:12px; font-weight:700; letter-spacing:.08em;
+        text-transform:uppercase; color:#7dd3fc; margin-bottom:6px; }
+  .inp{
+    width:100%; padding:15px 14px; font-size:16px; border-radius:12px;
+    background:#0a1119; border:1px solid var(--line); color:#e2e8f0; outline:none;
+  }
+  .inp:focus{ border-color:var(--cyan); box-shadow:0 0 0 3px rgba(34,211,238,.18); }
+
+  .btn-primary{
+    width:100%; padding:17px; border-radius:14px; border:0; cursor:pointer;
+    font-size:16px; font-weight:800; letter-spacing:.02em; color:#04141a;
+    background:linear-gradient(90deg,#22d3ee,#34d399);
+    box-shadow:0 8px 20px rgba(34,211,238,.22);
+    transition:.15s; min-height:58px;
+  }
+  .btn-primary:active{ transform:scale(.98); }
+  .btn-primary:disabled{ opacity:.35; box-shadow:none; }
+
+  .btn-sec{
+    width:100%; padding:15px; border-radius:14px; cursor:pointer; min-height:54px;
+    font-size:15px; font-weight:700; color:#a5f3fc;
+    background:#0c1620; border:1px solid #1e3a44;
+  }
+  .btn-sec:active{ transform:scale(.98); }
+
+  .opt{
+    width:100%; text-align:left; padding:15px 16px; border-radius:14px;
+    border:1px solid var(--line); background:#0c141d; color:#dbeafe;
+    font-size:15px; line-height:1.4; min-height:60px; cursor:pointer;
+    transition:.15s; display:flex; gap:10px; align-items:flex-start;
+  }
+  .opt:active{ transform:scale(.985); border-color:#334155; }
+  .opt .bullet{
+    flex:0 0 24px; height:24px; border-radius:7px; display:flex; align-items:center;
+    justify-content:center; font-size:12px; font-weight:800;
+    background:#13202c; border:1px solid #24384a; color:#7dd3fc; margin-top:1px;
+  }
+  .opts.locked{ pointer-events:none; }
+  .opts.locked .opt{ opacity:.55; }
+  .opt.correct{
+    border-color:var(--green)!important; background:rgba(52,211,153,.14)!important;
+    opacity:1!important; box-shadow:0 0 0 2px rgba(52,211,153,.3);
+  }
+  .opt.correct .bullet{ background:rgba(52,211,153,.25); border-color:#34d399; color:#a7f3d0; }
+  .opt.wrong{
+    border-color:#fb7185!important; background:rgba(251,113,133,.13)!important; opacity:1!important;
+  }
+  .opt.wrong .bullet{ background:rgba(251,113,133,.22); border-color:#fb7185; color:#fecdd3; }
+
+  .fb{ border-radius:12px; padding:12px 14px; font-size:14px; line-height:1.5;
+       background:#0b1520; border-left:3px solid var(--cyan); }
+
+  .bar-track{ height:10px; border-radius:99px; background:#0a1119; border:1px solid #1b2836; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:99px; transition:width .6s cubic-bezier(.2,.8,.2,1);
+             background:linear-gradient(90deg,#22d3ee,#34d399); }
+
+  .metric-num{ font-variant-numeric: tabular-nums; }
+
+  .concl{
+    width:100%; min-height:110px; padding:14px; font-size:15px; line-height:1.5;
+    border-radius:12px; background:#0a1119; border:1px solid var(--line);
+    color:#e2e8f0; resize:vertical; outline:none; font-family:inherit;
+  }
+  .concl:focus{ border-color:var(--cyan); box-shadow:0 0 0 3px rgba(34,211,238,.15); }
+
+  input[type=range]{ -webkit-appearance:none; width:100%; height:38px; background:transparent; }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:8px; border-radius:99px; background:#12202c; border:1px solid #24384a; }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:28px; height:28px; border-radius:50%;
+    background:linear-gradient(180deg,#22d3ee,#0891b2); margin-top:-11px;
+    border:2px solid #0b131b; box-shadow:0 0 12px rgba(34,211,238,.6); }
+  input[type=range]::-moz-range-track{ height:8px; border-radius:99px; background:#12202c; }
+  input[type=range]::-moz-range-thumb{ width:26px; height:26px; border-radius:50%;
+    background:#22d3ee; border:2px solid #0b131b; }
+
+  .switch{ display:flex; gap:8px; }
+  .switch button{
+    flex:1; padding:13px 8px; border-radius:12px; font-size:14px; font-weight:700;
+    background:#0c141d; border:1px solid var(--line); color:#94a3b8; cursor:pointer; min-height:50px;
+  }
+  .switch button.on{ background:rgba(34,211,238,.15); border-color:var(--cyan); color:#a5f3fc; }
+
+  #topbar{
+    position:sticky; top:0; z-index:40; backdrop-filter:blur(10px);
+    background:rgba(7,11,16,.88); border-bottom:1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= TOPBAR ================= -->
+<header id="topbar" class="hidden">
+  <div class="max-w-2xl mx-auto px-4 py-3">
+    <div class="flex items-center justify-between mb-2">
+      <span id="pasoTitulo" class="text-xs font-bold tracking-wider text-cyan-300 uppercase">Caso 1 · IA</span>
+      <span class="text-[11px] text-slate-400">Paso <b id="pasoActual" class="text-slate-200">1</b> de <span id="pasoTotal">6</span></span>
+    </div>
+    <div class="bar-track"><div id="progFill" class="bar-fill" style="width:16%"></div></div>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-4 pb-28 pt-4">
+
+  <!-- ================= 0. BIENVENIDA ================= -->
+  <section id="pantalla-inicio" class="pantalla activa">
+    <div class="text-center pt-8 pb-6">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
+           style="background:linear-gradient(135deg,#0e7490,#065f46);box-shadow:0 0 30px rgba(34,211,238,.35)">
+        <span style="font-size:30px">⚙️</span>
+      </div>
+      <h1 class="text-2xl font-black tracking-tight leading-tight">EL LÍMITE DE LA LÓGICA GENERAL</h1>
+      <p class="text-cyan-400 font-semibold text-sm mt-1">y el ascenso del silicio especializado</p>
+      <p class="text-slate-400 text-sm mt-3">Simulador de ASICs · Hardware III · 5.º año</p>
+    </div>
+
+    <div class="card p-5 space-y-4">
+      <div>
+        <label class="lbl" for="inNombre">Nombre y Apellido *</label>
+        <input id="inNombre" class="inp" type="text" placeholder="Ej.: Ana Gómez" autocomplete="name">
+      </div>
+      <div>
+        <label class="lbl" for="inCurso">Curso / División *</label>
+        <input id="inCurso" class="inp" type="text" placeholder="Ej.: 5.º B" autocomplete="organization">
+      </div>
+      <p id="errInicio" class="text-rose-400 text-sm hidden">⚠ Completá ambos campos para continuar.</p>
+      <button onclick="iniciar()" class="btn-primary">▶ Iniciar Simulación</button>
+    </div>
+
+    <div class="card p-4 mt-4 text-xs text-slate-400 leading-relaxed">
+      <b class="text-slate-300">Objetivo:</b> comprender por qué el silicio de función fija (ASIC) supera a la
+      lógica general (CPU / GPU) en rendimiento, eficiencia energética y densidad de cómputo, y en qué
+      escenarios conviene cada tecnología. Al finalizar se descarga un informe <b>.doc</b> para entregar.
+    </div>
+  </section>
+
+  <!-- ================= 1. IA ================= -->
+  <section id="pantalla-caso1" class="pantalla" data-req="c1q1,c1q2,c1q3">
+    <div class="mb-4">
+      <span class="tag">CASO 1</span>
+      <h2 class="text-xl font-bold mt-2">Inteligencia Artificial</h2>
+      <p class="text-slate-400 text-sm mt-1">Matrices MAC, memoria HBM y escalabilidad tridimensional.</p>
+    </div>
+
+    <div class="card p-4 mb-4 text-sm text-slate-300 leading-relaxed">
+      <b class="text-cyan-400">Escenario:</b> el laboratorio debe entrenar un modelo de lenguaje de gran escala.
+      Los tensores se multiplican miles de millones de veces por paso. Tenés que decidir el silicio y la
+      arquitectura del <i>pod</i> de cómputo.
+    </div>
+
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-[11px] uppercase tracking-widest text-slate-500">Decisiones técnicas</span>
+      <span class="contador text-xs font-bold text-cyan-400">0/3</span>
+    </div>
+
+    <!-- Q1 -->
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">1. ¿Qué silicio asignás al cálculo de multiplicación y acumulación (MAC)?</p>
+      <div class="opts grid gap-3" data-key="c1q1"
+           data-q="¿Qué silicio asignás al cálculo MAC?"
+           data-exp="El ASIC/TPU sustituye las unidades aritméticas tradicionales por arreglos MAC masivos optimizados para tensores: se elimina el costo de decodificar instrucciones en cada ciclo.">
+        <button class="opt" data-t="CPU x86 de 64 núcleos de propósito general"
+          data-fb="La CPU interpreta instrucciones y paga sobrecosto energético por ciclo de reloj. En tensores queda órdenes de magnitud por detrás.">
+          <span class="bullet">A</span><span>CPU x86 de 64 núcleos de propósito general</span></button>
+        <button class="opt" data-correct="1" data-t="ASIC con arreglos MAC (TPU v6e)"
+          data-fb="Correcto: los ASICs de IA reemplazan las unidades aritméticas por arquitecturas de matriz MAC optimizadas para tensores. El hardware <i>es</i> el algoritmo.">
+          <span class="bullet">B</span><span>ASIC con arreglos MAC dedicados (TPU v6e)</span></button>
+        <button class="opt" data-t="GPU paralela sin matriz MAC dedicada"
+          data-fb="La GPU aporta paralelismo masivo y matemáticas vectoriales, pero conserva versatilidad genérica: no es tan eficiente como un arreglo MAC dedicado.">
+          <span class="bullet">C</span><span>GPU paralela sin matriz MAC dedicada</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <!-- Q2 -->
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">2. La matriz de pesos ocupa 28 GB y el cómputo es continuo. ¿Cómo evitás el cuello de botella de memoria?</p>
+      <div class="opts grid gap-3" data-key="c1q2"
+           data-q="¿Cómo evitás el cuello de botella de memoria en IA?"
+           data-exp="En IA el desafío no es solo procesar, sino mover los datos. La memoria HBM apilada junto al arreglo MAC multiplica el ancho de banda y evita que la unidad de cómputo quede ociosa.">
+        <button class="opt" data-t="64 GB DDR5 con ~100 GB/s"
+          data-fb="Capacidad sí, ancho de banda no: con ~100 GB/s el arreglo MAC queda esperando datos la mayor parte del tiempo.">
+          <span class="bullet">A</span><span>64 GB DDR5 con ~100 GB/s de ancho de banda</span></button>
+        <button class="opt" data-correct="1" data-t="32 GB HBM integrada junto al arreglo MAC"
+          data-fb="Correcto: el TPU v6e integra 32 GB de HBM. La clave no es la capacidad sino el ancho de banda por bit movido.">
+          <span class="bullet">B</span><span>32 GB de memoria HBM integrada junto al arreglo MAC</span></button>
+        <button class="opt" data-t="300 MB de caché L3"
+          data-fb="La caché es rápida pero diminuta: no contiene una matriz de 28 GB ni alimenta un arreglo MAC completo.">
+          <span class="bullet">C</span><span>300 MB de caché L3 compartida</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <!-- Q3 -->
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">3. Para escalar a miles de chips, ¿qué topología de interconexión elegís?</p>
+      <div class="opts grid gap-3" data-key="c1q3"
+           data-q="¿Qué topología de interconexión elegís para escalar a miles de chips?"
+           data-exp="La topología de toroide 3D con interconexión duplicada (ICI) permite conectar miles de chips de forma simétrica por pod, escalando la capacidad de cómputo sin embudos de comunicación.">
+        <button class="opt" data-t="Bus en anillo compartido"
+          data-fb="Un bus compartido se satura: todos los chips compiten por el mismo canal y la latencia crece con cada nodo agregado.">
+          <span class="bullet">A</span><span>Bus en anillo compartido entre todos los chips</span></button>
+        <button class="opt" data-t="Ethernet 1 GbE de gestión"
+          data-fb="Sirve para administración, no para sincronizar gradientes: el ancho de banda es ridículo frente al volumen de tensores.">
+          <span class="bullet">B</span><span>Ethernet 1 GbE de gestión</span></button>
+        <button class="opt" data-correct="1" data-t="Toroide 3D con interconexión ICI duplicada"
+          data-fb="Correcto: el TPU v6e organiza los chips en topología de toroide 3D con ICI duplicada, conectando miles de chips simétricamente por pod.">
+          <span class="bullet">C</span><span>Toroide 3D con interconexión (ICI) duplicada</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <div class="card p-4 mt-6">
+      <p class="text-[11px] uppercase tracking-widest text-slate-500 mb-4">Panel de impacto · Clúster de IA</p>
+      <div class="impacto space-y-4" data-caso="caso1"></div>
+    </div>
+
+    <button class="btn-primary btn-continuar mt-6" disabled onclick="ir('caso2')">Continuar → Redes</button>
+  </section>
+
+  <!-- ================= 2. REDES ================= -->
+  <section id="pantalla-caso2" class="pantalla" data-req="c2q1,c2q2,c2q3">
+    <div class="mb-4">
+      <span class="tag">CASO 2</span>
+      <h2 class="text-xl font-bold mt-2">Infraestructura de Redes</h2>
+      <p class="text-slate-400 text-sm mt-1">Conmutación monolítica Leaf / Spine y control de congestión.</p>
+    </div>
+
+    <div class="card p-4 mb-4 text-sm text-slate-300 leading-relaxed">
+      <b class="text-cyan-400">Escenario:</b> hay que unir 8.000 aceleradores en un <i>AI fabric</i>. El silicio de red
+      debe mover paquetes con latencia ultrabaja y evitar que las CPUs de los servidores hagan de router.
+    </div>
+
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-[11px] uppercase tracking-widest text-slate-500">Decisiones técnicas</span>
+      <span class="contador text-xs font-bold text-cyan-400">0/3</span>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">1. ¿Qué silicio colocás en el <b>nivel Leaf</b> (acceso a los nodos de cómputo)?</p>
+      <div class="opts grid gap-3" data-key="c2q1"
+           data-q="¿Qué silicio colocás en el nivel Leaf?"
+           data-exp="El nivel Leaf usa conmutación monolítica de un solo chip: Broadcom Tomahawk 5 entrega 51,2 Tbps y hasta 64 puertos de 800 Gbps o 128 de 400 Gbps.">
+        <button class="opt" data-correct="1" data-t="Conmutador monolítico Tomahawk 5 (51,2 Tbps)"
+          data-fb="Correcto: conmutación monolítica de un solo chip, 51,2 Tbps y puertos de 800/400 Gbps. Es el estándar para clústeres de IA.">
+          <span class="bullet">A</span><span>Conmutador monolítico Broadcom Tomahawk 5 (51,2 Tbps)</span></button>
+        <button class="opt" data-t="Servidor con CPU general haciendo de router"
+          data-fb="Eso es justamente lo que hay que evitar: la CPU se satura y agrega latencia por software.">
+          <span class="bullet">B</span><span>Un servidor con CPU general haciendo de router</span></button>
+        <button class="opt" data-t="Switch de 1 GbE doméstico"
+          data-fb="El ancho de banda es insuficiente: cada acelerador necesita cientos de Gbps, no uno.">
+          <span class="bullet">C</span><span>Switch de 1 GbE reutilizado</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">2. ¿Y en el <b>nivel Spine</b>, que une todos los nodos del centro de datos?</p>
+      <div class="opts grid gap-3" data-key="c2q2"
+           data-q="¿Qué silicio colocás en el nivel Spine?"
+           data-exp="El Spine es el fabric a escala de chasis: Jericho3-AI aporta 28,8 Tbps por chip y se expande a cientos de Tbps por chasis para gestionar congestión extrema.">
+        <button class="opt" data-t="El mismo switch Leaf reutilizado"
+          data-fb="El Leaf no está diseñado para la gestión de congestión a escala de chasis: hace falta silicio de fabric.">
+          <span class="bullet">A</span><span>Reutilizar el mismo switch del nivel Leaf</span></button>
+        <button class="opt" data-correct="1" data-t="Broadcom Jericho3-AI (28,8 Tbps por chip)"
+          data-fb="Correcto: capa Spine / fabric de IA a escala de chasis, 28,8 Tbps por chip y expansión a cientos de Tbps.">
+          <span class="bullet">B</span><span>Broadcom Jericho3-AI (28,8 Tbps por chip)</span></button>
+        <button class="opt" data-t="Enlaces inalámbricos WiFi 6"
+          data-fb="Latencia y jitter inaceptables para sincronización de gradientes a escala de miles de nodos.">
+          <span class="bullet">C</span><span>Enlaces inalámbricos WiFi 6</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">3. El clúster empieza a perder paquetes en hora pico. ¿Qué priorizás?</p>
+      <div class="opts grid gap-3" data-key="c2q3"
+           data-q="¿Qué priorizás ante la congestión del clúster?"
+           data-exp="En un AI fabric lo que define el rendimiento es la topología y la capacidad de ancho de banda terabit por chasis, combinando conmutación y enrutamiento con protocolos avanzados de control de congestión.">
+        <button class="opt" data-t="Subir la frecuencia de las CPUs de los servidores"
+          data-fb="No ataca la causa: el problema está en la red, no en el cómputo.">
+          <span class="bullet">A</span><span>Subir la frecuencia de las CPUs de los servidores</span></button>
+        <button class="opt" data-t="Reducir la cantidad de nodos conectados"
+          data-fb="Sacrifica la capacidad de cómputo en lugar de resolver la congestión.">
+          <span class="bullet">B</span><span>Reducir la cantidad de nodos conectados</span></button>
+        <button class="opt" data-correct="1" data-t="Escalar el Spine a cientos de Tbps por chasis"
+          data-fb="Correcto: Cisco Silicon One (Q200/G200) combina conmutación y enrutamiento a cientos de Tbps con protocolos avanzados de congestión.">
+          <span class="bullet">C</span><span>Escalar el Spine a cientos de Tbps por chasis con protocolos de congestión</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <div class="card p-4 mt-6">
+      <p class="text-[11px] uppercase tracking-widest text-slate-500 mb-4">Panel de impacto · AI Fabric</p>
+      <div class="impacto space-y-4" data-caso="caso2"></div>
+    </div>
+
+    <button class="btn-primary btn-continuar mt-6" disabled onclick="ir('caso3')">Continuar → Minería</button>
+  </section>
+
+  <!-- ================= 3. MINERÍA ================= -->
+  <section id="pantalla-caso3" class="pantalla" data-req="c3q1">
+    <div class="mb-4">
+      <span class="tag">CASO 3</span>
+      <h2 class="text-xl font-bold mt-2">Minería / Hashing Industrial</h2>
+      <p class="text-slate-400 text-sm mt-1">Eficiencia energética (J/TH) y ecuación térmica.</p>
+    </div>
+
+    <div class="card p-4 mb-4 text-sm text-slate-300 leading-relaxed">
+      <b class="text-cyan-400">Escenario:</b> ASICs puros grabados exclusivamente para ejecutar SHA-256.
+      El parámetro de supervivencia no es la tasa de hash bruta, sino <b>cuántos julios cuesta cada terahash</b>.
+      Cada julio ahorrado es rentabilidad operativa 24/7.
+    </div>
+
+    <!-- Calculadora -->
+    <div class="card p-4 mb-4">
+      <p class="text-[11px] uppercase tracking-widest text-slate-500 mb-4">Calculadora · Bitmain Antminer S21</p>
+
+      <div class="mb-5">
+        <div class="flex justify-between items-baseline mb-1">
+          <label class="lbl" style="margin:0">Cantidad de equipos</label>
+          <span id="mCantLbl" class="metric-num text-cyan-300 font-bold text-lg">10</span>
+        </div>
+        <input id="mCant" type="range" min="1" max="100" value="10" oninput="calcMineria()">
+      </div>
+
+      <div class="mb-5">
+        <label class="lbl">Tipo de refrigeración</label>
+        <div class="switch" id="mCool">
+          <button class="on" data-hydro="0" onclick="setCool(0)">🌬 Aire (17,5 J/TH)</button>
+          <button data-hydro="1" onclick="setCool(1)">💧 Hidro (16,0 J/TH)</button>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="lbl" for="mPrecio">Costo de la energía (USD por kWh)</label>
+        <input id="mPrecio" class="inp" type="number" step="0.01" min="0" value="0.12" oninput="calcMineria()">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 mt-5">
+        <div class="rounded-xl p-3" style="background:#0a1119;border:1px solid var(--line)">
+          <p class="text-[10px] uppercase tracking-wider text-slate-500">Tasa total</p>
+          <p id="rTH" class="metric-num text-lg font-black text-cyan-300">2.000 TH/s</p>
+        </div>
+        <div class="rounded-xl p-3" style="background:#0a1119;border:1px solid var(--line)">
+          <p class="text-[10px] uppercase tracking-wider text-slate-500">Consumo</p>
+          <p id="rW" class="metric-num text-lg font-black text-cyan-300">35.000 W</p>
+        </div>
+        <div class="rounded-xl p-3" style="background:#0a1119;border:1px solid var(--line)">
+          <p class="text-[10px] uppercase tracking-wider text-slate-500">Eficiencia</p>
+          <p id="rJTH" class="metric-num text-lg font-black text-emerald-300">17,5 J/TH</p>
+        </div>
+        <div class="rounded-xl p-3" style="background:#0a1119;border:1px solid var(--line)">
+          <p class="text-[10px] uppercase tracking-wider text-slate-500">Energía / día</p>
+          <p id="rKwh" class="metric-num text-lg font-black text-emerald-300">840 kWh</p>
+        </div>
+        <div class="rounded-xl p-3 col-span-2" style="background:#0a1119;border:1px solid var(--line)">
+          <p class="text-[10px] uppercase tracking-wider text-slate-500">Costo operativo diario / mensual</p>
+          <p id="rCosto" class="metric-num text-lg font-black text-amber-300">USD 100,80 / día</p>
+        </div>
+      </div>
+
+      <div id="rAhorro" class="mt-3 text-xs text-slate-400 leading-relaxed"></div>
+    </div>
+
+    <div class="card p-4 mt-6 mb-4">
+      <p class="text-[11px] uppercase tracking-widest text-slate-500 mb-4">Panel de impacto · Granja de minería</p>
+      <div class="impacto space-y-4" data-caso="caso3"></div>
+    </div>
+
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-[11px] uppercase tracking-widest text-slate-500">Decisión técnica</span>
+      <span class="contador text-xs font-bold text-cyan-400">0/1</span>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">Con esos números sobre la mesa, ¿qué criterio define la rentabilidad 24/7?</p>
+      <div class="opts grid gap-3" data-key="c3q1"
+           data-q="¿Qué criterio define la rentabilidad en minería industrial?"
+           data-exp="En minería el parámetro de supervivencia es la eficiencia energética absoluta (J/TH). Cada julio por terahash ahorrado se traduce directamente en margen operativo, y la refrigeración líquida baja de 17,5 a 16,0 J/TH.">
+        <button class="opt" data-t="Maximizar la tasa de hash bruta (TH/s)"
+          data-fb="La tasa bruta sin mirar el consumo puede dar pérdida: si el equipo es ineficiente, cada terahash cuesta más de lo que rinde.">
+          <span class="bullet">A</span><span>Maximizar la tasa de hash bruta (TH/s) sin mirar el consumo</span></button>
+        <button class="opt" data-correct="1" data-t="Minimizar los J/TH y la disipación térmica"
+          data-fb="Correcto: el parámetro de supervivencia es J/TH. La hidrorrefrigeración baja la eficiencia de 17,5 a 16,0 J/TH y reduce el consumo por equipo de 3.500 W a 3.200 W.">
+          <span class="bullet">B</span><span>Minimizar los J/TH y la disipación térmica por equipo</span></button>
+        <button class="opt" data-t="Comprar más equipos aunque sean ineficientes"
+          data-fb="Escala el problema: multiplica el consumo y el calor sin mejorar el costo por terahash.">
+          <span class="bullet">C</span><span>Comprar más equipos aunque sean ineficientes</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <button class="btn-primary btn-continuar mt-6" disabled onclick="ir('caso4')">Continuar → Criptografía</button>
+  </section>
+
+  <!-- ================= 4. CRIPTOGRAFÍA ================= -->
+  <section id="pantalla-caso4" class="pantalla" data-req="c4q1,c4q2,c4q3">
+    <div class="mb-4">
+      <span class="tag">CASO 4</span>
+      <h2 class="text-xl font-bold mt-2">Seguridad Criptográfica</h2>
+      <p class="text-slate-400 text-sm mt-1">Descarga de hardware (<i>offload</i>) y liberación de ciclos de CPU.</p>
+    </div>
+
+    <div class="card p-4 mb-4 text-sm text-slate-300 leading-relaxed">
+      <b class="text-cyan-400">Escenario:</b> un servidor recibe miles de conexiones TLS por segundo.
+      La encriptación ahoga los núcleos de propósito general y la aplicación principal se ralentiza.
+    </div>
+
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-[11px] uppercase tracking-widest text-slate-500">Decisiones técnicas</span>
+      <span class="contador text-xs font-bold text-cyan-400">0/3</span>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">1. ¿Dónde resolvés el handshake TLS 1.3 y el cifrado simétrico?</p>
+      <div class="opts grid gap-3" data-key="c4q1"
+           data-q="¿Dónde resolvés el handshake TLS 1.3 y el cifrado simétrico?"
+           data-exp="El acelerador criptográfico asume exclusivamente las operaciones matemáticas intensivas y libera los núcleos principales, reduciendo drásticamente la latencia de las aplicaciones.">
+        <button class="opt" data-t="Todo en los núcleos principales de la CPU"
+          data-fb="Es justamente el cuello de botella: la encriptación ahoga los núcleos de propósito general.">
+          <span class="bullet">A</span><span>Todo en los núcleos principales de la CPU</span></button>
+        <button class="opt" data-correct="1" data-t="Descargarlo a un motor criptográfico dedicado"
+          data-fb="Correcto: el offload lleva las operaciones intensivas a silicio especializado (Intel QAT o Marvell OCTEON).">
+          <span class="bullet">B</span><span>Descargarlo a un motor criptográfico dedicado (offload)</span></button>
+        <button class="opt" data-t="Bajar la versión de TLS a una más débil"
+          data-fb="Sacrifica seguridad y no resuelve el problema de rendimiento.">
+          <span class="bullet">C</span><span>Bajar la versión de TLS a una más débil</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">2. Necesitás acelerar clave pública (RSA, ECC), cifrado simétrico y compresión en el mismo servidor. ¿Qué elegís?</p>
+      <div class="opts grid gap-3" data-key="c4q2"
+           data-q="¿Qué solución elegís para clave pública, cifrado simétrico y compresión?"
+           data-exp="Intel QAT, integrado en Xeon, acelera criptografía de clave pública (RSA, ECC), cifrado simétrico y compresión, alcanzando hasta 400 Gbps de cifrado simétrico por servidor y mejorando el handshake TLS 1.3 en más del 50%.">
+        <button class="opt" data-correct="1" data-t="Intel QAT integrado en Xeon"
+          data-fb="Correcto: hasta 400 Gbps de cifrado simétrico por servidor y mejora del handshake TLS 1.3 en más del 50%.">
+          <span class="bullet">A</span><span>Intel QAT integrado en el procesador Xeon</span></button>
+        <button class="opt" data-t="Marvell OCTEON dedicado"
+          data-fb="OCTEON es excelente para SSL/TLS, firewall NGFW y desduplicación de almacenamiento, pero el enunciado pide también clave pública y compresión integradas.">
+          <span class="bullet">B</span><span>Tarjetas dedicadas Marvell OCTEON</span></button>
+        <button class="opt" data-t="Más núcleos de CPU sin acelerador"
+          data-fb="Escalar horizontalmente el problema encarece el servidor sin resolver la sobrecarga matemática.">
+          <span class="bullet">C</span><span>Agregar más núcleos de CPU sin acelerador</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">3. Además del TLS, hay que inspeccionar tráfico con firewall y desduplicar almacenamiento. ¿Qué silicio aplicás?</p>
+      <div class="opts grid gap-3" data-key="c4q3"
+           data-q="¿Qué silicio aplicás para firewall NGFW y desduplicación de almacenamiento?"
+           data-exp="Marvell OCTEON implementa motores de hardware fijo para descifrado SSL/TLS, procesamiento de reglas de firewall (NGFW) y desduplicación en sistemas de almacenamiento: función fija, cero flexibilidad, máximo throughput.">
+        <button class="opt" data-t="Software corriendo en la CPU principal"
+          data-fb="El software de inspección profunda consume ciclos que la aplicación principal necesita.">
+          <span class="bullet">A</span><span>Software de inspección corriendo en la CPU principal</span></button>
+        <button class="opt" data-t="Delegar todo a la GPU"
+          data-fb="La GPU no está optimizada para reglas de firewall ni desduplicación: es versátil pero ineficiente para esa función fija.">
+          <span class="bullet">B</span><span>Delegar la tarea a la GPU del servidor</span></button>
+        <button class="opt" data-correct="1" data-t="Marvell OCTEON con motores de hardware fijo"
+          data-fb="Correcto: motores de hardware fijo para descifrado SSL/TLS, reglas NGFW y desduplicación en almacenamiento.">
+          <span class="bullet">C</span><span>Marvell OCTEON con motores de hardware fijo</span></button>
+      </div>
+      <div class="fb hidden mt-3"></div>
+    </div>
+
+    <div class="card p-4 mt-6">
+      <p class="text-[11px] uppercase tracking-widest text-slate-500 mb-4">Panel de impacto · Servidor seguro</p>
+      <div class="impacto space-y-4" data-caso="caso4"></div>
+    </div>
+
+    <button class="btn-primary btn-continuar mt-6" disabled onclick="ir('conclusiones')">Continuar → Conclusiones</button>
+  </section>
+
+  <!-- ================= 5. CONCLUSIONES ================= -->
+  <section id="pantalla-conclusiones" class="pantalla">
+    <div class="mb-4">
+      <span class="tag">CIERRE</span>
+      <h2 class="text-xl font-bold mt-2">Fundamentación técnica</h2>
+      <p class="text-slate-400 text-sm mt-1">Redactá tus respuestas con lo observado en el simulador.</p>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-2">1. Silicio general vs. silicio especializado</p>
+      <p class="text-xs text-slate-400 mb-3">¿Por qué un ASIC de función fija logra mayor eficiencia energética que una CPU de propósito general? Mencioná el sobrecosto de decodificación de instrucciones.</p>
+      <textarea id="con1" class="concl" placeholder="Escribí tu fundamentación..."></textarea>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-2">2. Topología de red en clústeres de IA</p>
+      <p class="text-xs text-slate-400 mb-3">Explicá por qué la topología (Leaf/Spine, toroide 3D) puede ser más determinante que la potencia de cómputo de cada chip.</p>
+      <textarea id="con2" class="concl" placeholder="Escribí tu fundamentación..."></textarea>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-2">3. La ecuación térmica y los J/TH</p>
+      <p class="text-xs text-slate-400 mb-3">Justificá por qué en minería el parámetro J/TH pesa más que la tasa de hash bruta. Usá los números que obtuviste en la calculadora.</p>
+      <textarea id="con3" class="concl" placeholder="Escribí tu fundamentación..."></textarea>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-2">4. Offload criptográfico</p>
+      <p class="text-xs text-slate-400 mb-3">¿Qué significa "offload" criptográfico y qué beneficios concretos aporta a un servidor que atiende miles de handshakes TLS?</p>
+      <textarea id="con4" class="concl" placeholder="Escribí tu fundamentación..."></textarea>
+    </div>
+
+    <p id="errConcl" class="text-rose-400 text-sm mb-3 hidden">⚠ Completá las cuatro consignas antes de generar el informe.</p>
+    <button class="btn-primary" onclick="finalizar()">✔ Finalizar y ver informe</button>
+  </section>
+
+  <!-- ================= 6. INFORME ================= -->
+  <section id="pantalla-informe" class="pantalla">
+    <div class="mb-4">
+      <span class="tag">RESULTADO</span>
+      <h2 class="text-xl font-bold mt-2">Informe de Simulación</h2>
+      <p class="text-slate-400 text-sm mt-1">Revisá el resumen y descargá tu comprobante.</p>
+    </div>
+
+    <div class="card p-5 mb-4 text-center">
+      <p class="text-[11px] uppercase tracking-widest text-slate-500 mb-2">Puntaje de decisiones técnicas</p>
+      <p id="infScore" class="metric-num text-4xl font-black" style="color:#22d3ee">0 / 10</p>
+      <p id="infPct" class="text-sm text-slate-400 mt-1">0% de acierto</p>
+      <div class="bar-track mt-4"><div id="infBar" class="bar-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="card p-5 mb-4">
+      <p class="text-[11px] uppercase tracking-widest text-slate-500 mb-3">Datos del alumno</p>
+      <p class="text-sm"><b class="text-slate-400">Nombre:</b> <span id="infNombre">—</span></p>
+      <p class="text-sm mt-1"><b class="text-slate-400">Curso:</b> <span id="infCurso">—</span></p>
+      <p class="text-sm mt-1"><b class="text-slate-400">Fecha:</b> <span id="infFecha">—</span></p>
+    </div>
+
+    <div class="card p-5 mb-4">
+      <p class="text-[11px] uppercase tracking-widest text-slate-500 mb-3">Detalle de respuestas</p>
+      <div id="infDetalle" class="space-y-3 text-sm"></div>
+    </div>
+
+    <div class="card p-5 mb-6">
+      <p class="text-[11px] uppercase tracking-widest text-slate-500 mb-3">Fundamentación redactada</p>
+      <div id="infConcl" class="space-y-4 text-sm"></div>
+    </div>
+
+    <button class="btn-primary" onclick="descargarDoc()">⬇ Generar y Descargar Informe (.doc)</button>
+    <button class="btn-sec mt-3" onclick="ir('inicio')">↺ Volver al inicio</button>
+
+    <p class="text-[11px] text-slate-500 text-center mt-4 leading-relaxed">
+      El archivo se guarda en la carpeta <b>Descargas</b> de tu Android.<br>
+      Subilo a Google Classroom y usalo como respaldo de tu carpeta física.
+    </p>
+  </section>
+
+</main>
+
+<script>
+/* =========================================================
+   ESTADO GLOBAL
+   ========================================================= */
+const estado = { nombre:'', curso:'', fecha:'' };
+const respuestas = {};   // key -> {pregunta, elegida, ok, fb}
+const conclusiones = {}; // con1..con4
+
+const ORDEN = ['inicio','caso1','caso2','caso3','caso4','conclusiones','informe'];
+const TITULOS = {
+  inicio:'Bienvenida', caso1:'Caso 1 · IA', caso2:'Caso 2 · Redes',
+  caso3:'Caso 3 · Minería', caso4:'Caso 4 · Criptografía',
+  conclusiones:'Conclusiones', informe:'Informe final'
+};
+
+/* Métricas de impacto: valores (%) según cantidad de aciertos 0..3 */
+const METRICAS = {
+  caso1: [
+    { n:'Rendimiento de tensores', v:[15,45,75,98] },
+    { n:'Eficiencia energética',   v:[20,50,78,96] },
+    { n:'Ancho de banda efectivo (HBM)', v:[12,40,72,95] }
+  ],
+  caso2: [
+    { n:'Throughput del clúster (Tbps)', v:[18,48,76,97] },
+    { n:'Control de latencia de paquetes', v:[25,55,80,95] },
+    { n:'Escalabilidad a miles de nodos', v:[15,45,75,95] }
+  ],
+  caso3: [
+    { n:'Eficiencia energética (J/TH)', v:[55,55,55,55] },
+    { n:'Disipación térmica controlada', v:[40,40,40,40] },
+    { n:'Rentabilidad operativa 24/7', v:[50,50,50,50] }
+  ],
+  caso4: [
+    { n:'Throughput de cifrado (Gbps)', v:[20,50,80,98] },
+    { n:'CPU principal liberada', v:[15,45,78,96] },
+    { n:'Latencia de handshake TLS', v:[22,52,80,95] }
+  ]
+};
+
+/* =========================================================
+   NAVEGACIÓN
+   ========================================================= */
+function ir(id){
+  document.querySelectorAll('.pantalla').forEach(s => s.classList.remove('activa'));
+  const s = document.getElementById('pantalla-' + id);
+  if(s) s.classList.add('activa');
+  window.scrollTo(0,0);
+
+  const idx = ORDEN.indexOf(id);
+  document.getElementById('topbar').classList.toggle('hidden', id === 'inicio');
+  document.getElementById('pasoTitulo').textContent = TITULOS[id] || '';
+  document.getElementById('pasoActual').textContent = idx;
+  document.getElementById('pasoTotal').textContent = ORDEN.length - 1;
+  document.getElementById('progFill').style.width = (idx / (ORDEN.length - 1) * 100) + '%';
+
+  if(id === 'informe') construirInforme();
+  if(id === 'caso3') { setCool(0); }
+}
+
+/* =========================================================
+   BIENVENIDA
+   ========================================================= */
+function iniciar(){
+  const n = document.getElementById('inNombre').value.trim();
+  const c = document.getElementById('inCurso').value.trim();
+  if(!n || !c){
+    document.getElementById('errInicio').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('errInicio').classList.add('hidden');
+  estado.nombre = n;
+  estado.curso = c;
+  estado.fecha = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  // Inicializar paneles de impacto
+  ['caso1','caso2','caso4'].forEach(cs => actualizarImpacto(cs, 0));
+  ir('caso1');
+}
+
+/* =========================================================
+   MOTOR DE PREGUNTAS (delegación de eventos)
+   ========================================================= */
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('.opt');
+  if(!btn) return;
+  const cont = btn.closest('.opts');
+  if(!cont || cont.classList.contains('locked')) return;
+
+  cont.classList.add('locked');
+  const key = cont.dataset.key;
+  const pregunta = cont.dataset.q || '';
+  const correcto = cont.querySelector('.opt[data-correct="1"]');
+  const acierto = (btn === correcto);
+
+  btn.classList.add(acierto ? 'correct' : 'wrong');
+  if(!acierto && correcto) correcto.classList.add('correct');
+
+  respuestas[key] = {
+    pregunta: pregunta,
+    elegida: btn.dataset.t || btn.textContent.trim(),
+    ok: acierto
+  };
+
+  /* Feedback inmediato */
+  const card = cont.parentElement;
+  const fb = card.querySelector('.fb');
+  if(fb){
+    fb.classList.remove('hidden');
+    const head = acierto
+      ? '<span style="color:#34d399;font-weight:800">✔ Correcto. </span>'
+      : '<span style="color:#fb7185;font-weight:800">✘ Incorrecto. </span>';
+    const exp = cont.dataset.exp ? '<div style="margin-top:8px;color:#94a3b8">' + cont.dataset.exp + '</div>' : '';
+    fb.innerHTML = head + (btn.dataset.fb || '') + exp;
+  }
+
+  const pant = cont.closest('.pantalla');
+  verificarCaso(pant);
+  actualizarImpacto(pant.id.replace('pantalla-',''), contarAciertos(pant));
+});
+
+/* Cuenta aciertos del caso */
+function contarAciertos(pant){
+  const req = (pant.dataset.req || '').split(',').filter(Boolean);
+  return req.filter(k => respuestas[k] && respuestas[k].ok).length;
+}
+
+/* Habilita el botón continuar cuando todas las decisiones están tomadas */
+function verificarCaso(pant){
+  if(!pant) return;
+  const req = (pant.dataset.req || '').split(',').filter(Boolean);
+  const hechas = req.filter(k => respuestas[k]).length;
+  const cnt = pant.querySelector('.contador');
+  if(cnt) cnt.textContent = hechas + '/' + req.length;
+
+  const btn = pant.querySelector('.btn-continuar');
+  if(btn) btn.disabled = (hechas < req.length);
+}
+
+/* =========================================================
+   PANELES DE IMPACTO
+   ========================================================= */
+function actualizarImpacto(caso, aciertos){
+  const cont = document.querySelector('.impacto[data-caso="' + caso + '"]');
+  if(!cont) return;
+  const defs = METRICAS[caso];
+  if(!defs) return;
+
+  if(!cont.dataset.rendered){
+    cont.innerHTML = defs.map((d,i) =>
+      '<div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">' +
+          '<span style="color:#94a3b8">' + d.n + '</span>' +
+          '<span class="metric-num" data-val="' + i + '" style="color:#67e8f9;font-weight:700">0%</span>' +
+        '</div>' +
+        '<div class="bar-track"><div class="bar-fill" data-fill="' + i + '" style="width:0%"></div></div>' +
+      '</div>'
+    ).join('');
+    cont.dataset.rendered = '1';
+  }
+
+  const idx = Math.max(0, Math.min(3, aciertos));
+  defs.forEach((d,i) => {
+    const val = d.v[idx];
+    const fill = cont.querySelector('[data-fill="' + i + '"]');
+    const lbl  = cont.querySelector('[data-val="' + i + '"]');
+    if(fill) fill.style.width = val + '%';
+    if(lbl)  lbl.textContent = val + '%';
+  });
+}
+
+/* =========================================================
+   CASO 3 · CALCULADORA DE MINERÍA
+   ========================================================= */
+let hidro = 0;
+
+function setCool(v){
+  hidro = v;
+  const wrap = document.getElementById('mCool');
+  if(wrap){
+    wrap.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('on', parseInt(b.dataset.hydro,10) === v);
+    });
+  }
+  calcMineria();
+}
+
+function calcMineria(){
+  const cantEl = document.getElementById('mCant');
+  if(!cantEl) return;
+
+  const n = parseInt(cantEl.value, 10) || 1;
+  const precioEl = document.getElementById('mPrecio');
+  const precio = parseFloat(precioEl.value);
+  const precioVal = isNaN(precio) ? 0 : precio;
+
+  const TH_POR_EQUIPO = 200;
+  const JTH_AIRE = 17.5;
+  const JTH_HIDRO = 16.0;
+
+  const jth = hidro ? JTH_HIDRO : JTH_AIRE;
+  const wattsEq = jth * TH_POR_EQUIPO;      // 3500 W o 3200 W
+  const wattsTotal = wattsEq * n;
+  const thTotal = TH_POR_EQUIPO * n;
+  const kwhDia = wattsTotal * 24 / 1000;
+  const costoDia = kwhDia * precioVal;
+  const costoMes = costoDia * 30;
+
+  /* Comparativa contra refrigeración por aire */
+  const kwhAire = (JTH_AIRE * TH_POR_EQUIPO * n) * 24 / 1000;
+  const ahorroDia = (kwhAire - kwhDia) * precioVal;
+
+  document.getElementById('mCantLbl').textContent = n;
+  document.getElementById('rTH').textContent = thTotal.toLocaleString('es-AR') + ' TH/s';
+  document.getElementById('rW').textContent = wattsTotal.toLocaleString('es-AR') + ' W';
+  document.getElementById('rJTH').textContent = jth.toFixed(1).replace('.',',') + ' J/TH';
+  document.getElementById('rKwh').textContent = kwhDia.toLocaleString('es-AR',{maximumFractionDigits:0}) + ' kWh';
+  document.getElementById('rCosto').textContent =
+    'USD ' + costoDia.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' / día' +
+    '  ·  USD ' + costoMes.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0}) + ' / mes';
+
+  const ahorroTxt = hidro
+    ? '<b style="color:#34d399">Hidrorrefrigeración activa.</b> Ahorro estimado frente a aire: ' +
+      'USD ' + ahorroDia.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' por día ' +
+      '(' + (wattsEq * n / 1000).toFixed(1) + ' kW frente a ' + (JTH_AIRE*TH_POR_EQUIPO*n/1000).toFixed(1) + ' kW).'
+    : '<b style="color:#fbbf24">Refrigeración por aire.</b> Pasando a hidrorrefrigeración bajarías de 17,5 a 16,0 J/TH ' +
+      'y ahorrarías USD ' + ((kwhAire - (JTH_HIDRO*TH_POR_EQUIPO*n)*24/1000) * precioVal)
+        .toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' por día.';
+
+  document.getElementById('rAhorro').innerHTML = ahorroTxt;
+
+  /* Métricas del panel de impacto del Caso 3 */
+  const cont = document.querySelector('.impacto[data-caso="caso3"]');
+  if(cont){
+    const efic = hidro ? 96 : 78;                       // J/TH
+    const term = hidro ? 92 : 58;                       // disipación
+    const rent = Math.min(98, Math.round(40 + (n/100)*30 + (hidro?28:0)));
+    const vals = [efic, term, rent];
+    if(!cont.dataset.rendered){
+      cont.innerHTML = METRICAS.caso3.map((d,i) =>
+        '<div>' +
+          '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">' +
+            '<span style="color:#94a3b8">' + d.n + '</span>' +
+            '<span class="metric-num" data-val="' + i + '" style="color:#67e8f9;font-weight:700">0%</span>' +
+          '</div>' +
+          '<div class="bar-track"><div class="bar-fill" data-fill="' + i + '" style="width:0%"></div></div>' +
+        '</div>'
+      ).join('');
+      cont.dataset.rendered = '1';
+    }
+    vals.forEach((v,i) => {
+      const f = cont.querySelector('[data-fill="' + i + '"]');
+      const l = cont.querySelector('[data-val="' + i + '"]');
+      if(f) f.style.width = v + '%';
+      if(l) l.textContent = v + '%';
+    });
+  }
+}
+
+/* =========================================================
+   CONCLUSIONES
+   ========================================================= */
+function finalizar(){
+  const ids = ['con1','con2','con3','con4'];
+  const textos = ids.map(id => (document.getElementById(id).value || '').trim());
+
+  if(textos.some(t => t.length < 5)){
+    document.getElementById('errConcl').classList.remove('hidden');
+    document.getElementById('errConcl').scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+  document.getElementById('errConcl').classList.add('hidden');
+  conclusiones.con1 = textos[0];
+  conclusiones.con2 = textos[1];
+  conclusiones.con3 = textos[2];
+  conclusiones.con4 = textos[3];
+  ir('informe');
+}
+
+/* =========================================================
+   CONSTRUCCIÓN DEL INFORME EN PANTALLA
+   ========================================================= */
+const PREGUNTAS_CONCL = [
+  'Silicio general vs. silicio especializado',
+  'Topología de red en clústeres de IA',
+  'La ecuación térmica y los J/TH',
+  'Offload criptográfico'
+];
+
+function construirInforme(){
+  const claves = Object.keys(respuestas);
+  const total = claves.length;
+  const aciertos = claves.filter(k => respuestas[k].ok).length;
+  const pct = total ? Math.round(aciertos / total * 100) : 0;
+
+  document.getElementById('infNombre').textContent = estado.nombre;
+  document.getElementById('infCurso').textContent = estado.curso;
+  document.getElementById('infFecha').textContent = estado.fecha;
+  document.getElementById('infScore').textContent = aciertos + ' / ' + total;
+  document.getElementById('infPct').textContent = pct + '% de acierto';
+  document.getElementById('infBar').style.width = pct + '%';
+
+  /* Detalle */
+  const det = document.getElementById('infDetalle');
+  det.innerHTML = claves.map(k => {
+    const r = respuestas[k];
+    const color = r.ok ? '#34d399' : '#fb7185';
+    const icono = r.ok ? '✔' : '✘';
+    return '<div style="border-left:3px solid ' + color + ';padding-left:10px">' +
+      '<p style="color:#cbd5e1;font-size:13px">' + escapar(r.pregunta) + '</p>' +
+      '<p style="color:' + color + ';font-size:13px;font-weight:700;margin-top:3px">' + icono + ' ' + escapar(r.elegida) + '</p>' +
+    '</div>';
+  }).join('');
+
+  /* Conclusiones */
+  const cc = document.getElementById('infConcl');
+  const keys = ['con1','con2','con3','con4'];
+  cc.innerHTML = keys.map((k,i) =>
+    '<div><p style="color:#67e8f9;font-weight:700;font-size:13px;margin-bottom:4px">' + (i+1) + '. ' + PREGUNTAS_CONCL[i] + '</p>' +
+    '<p style="color:#cbd5e1;font-size:13px;line-height:1.55;white-space:pre-wrap">' + escapar(conclusiones[k] || '—') + '</p></div>'
+  ).join('');
+}
+
+/* =========================================================
+   GENERACIÓN Y DESCARGA DEL .DOC
+   ========================================================= */
+function descargarDoc(){
+  const claves = Object.keys(respuestas);
+  const total = claves.length;
+  const aciertos = claves.filter(k => respuestas[k].ok).length;
+  const pct = total ? Math.round(aciertos / total * 100) : 0;
+
+  /* --- Tabla de resultados --- */
+  let filas = '';
+  claves.forEach(k => {
+    const r = respuestas[k];
+    let caso = 'Caso 1 · IA';
+    if(k.indexOf('c2') === 0) caso = 'Caso 2 · Redes';
+    if(k.indexOf('c3') === 0) caso = 'Caso 3 · Minería';
+    if(k.indexOf('c4') === 0) caso = 'Caso 4 · Criptografía';
+    filas += '<tr>' +
+      '<td style="border:1px solid #999;padding:6px;font-size:10pt">' + caso + '</td>' +
+      '<td style="border:1px solid #999;padding:6px;font-size:10pt">' + escapar(r.pregunta) + '</td>' +
+      '<td style="border:1px solid #999;padding:6px;font-size:10pt">' + escapar(r.elegida) + '</td>' +
+      '<td style="border:1px solid #999;padding:6px;font-size:10pt;text-align:center;font-weight:bold;color:' +
+        (r.ok ? '#047857' : '#b91c1c') + '">' + (r.ok ? 'CORRECTO' : 'INCORRECTO') + '</td>' +
+    '</tr>';
+  });
+
+  /* --- Conclusiones --- */
+  const keys = ['con1','con2','con3','con4'];
+  let conclHtml = '';
+  keys.forEach((k,i) => {
+    conclHtml +=
+      '<p style="font-family:Calibri,Arial;font-size:11pt;font-weight:bold;color:#0e7490;margin:14px 0 4px 0">' +
+        (i+1) + '. ' + PREGUNTAS_CONCL[i] + '</p>' +
+      '<p style="font-family:Calibri,Arial;font-size:11pt;line-height:1.5;margin:0;text-align:justify">' +
+        escapar(conclusiones[k] || 'Sin responder.').replace(/\n/g,'<br>') + '</p>';
+  });
+
+  const doc =
+'<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+      'xmlns:w="urn:schemas-microsoft-com:office:word" ' +
+      'xmlns="http://www.w3.org/TR/REC-html40">' +
+'<head><meta charset="utf-8">' +
+'<title>Informe de Simulación - Hardware III</title>' +
+'<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View>' +
+'<w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
+'<style>' +
+'@page{size:A4;margin:2cm;}' +
+'body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#111;}' +
+'h1{font-size:16pt;color:#0e7490;margin:0 0 2px 0;}' +
+'h2{font-size:13pt;color:#0e7490;border-bottom:2px solid #22d3ee;padding-bottom:4px;margin:22px 0 8px 0;}' +
+'table{border-collapse:collapse;width:100%;}' +
+'th{background:#0e7490;color:#fff;border:1px solid #999;padding:7px;font-size:10pt;text-align:left;}' +
+'.box{border:1px solid #ccc;background:#f4f8fa;padding:12px;margin:10px 0;}' +
+'.foot{font-size:9pt;color:#666;margin-top:26px;border-top:1px solid #ccc;padding-top:8px;}' +
+'</style></head><body>' +
+
+'<h1>INFORME DE SIMULACIÓN · HARDWARE III</h1>' +
+'<p style="margin:0;font-size:11pt;color:#333"><b>Tema:</b> El Límite de la Lógica General y el Ascenso del Silicio Especializado (ASICs)</p>' +
+
+'<div class="box">' +
+  '<p style="margin:2px 0"><b>Alumno/a:</b> ' + escapar(estado.nombre) + '</p>' +
+  '<p style="margin:2px 0"><b>Curso / División:</b> ' + escapar(estado.curso) + '</p>' +
+  '<p style="margin:2px 0"><b>Fecha:</b> ' + escapar(estado.fecha) + '</p>' +
+  '<p style="margin:2px 0"><b>Puntaje de decisiones técnicas:</b> ' + aciertos + ' / ' + total +
+    ' (' + pct + '%)</p>' +
+'</div>' +
+
+'<h2>1. Resultados de los desafíos del simulador</h2>' +
+'<table><tr>' +
+  '<th style="width:18%">Módulo</th>' +
+  '<th style="width:40%">Consigna</th>' +
+  '<th style="width:30%">Respuesta elegida</th>' +
+  '<th style="width:12%">Resultado</th>' +
+'</tr>' + filas + '</table>' +
+
+'<h2>2. Fundamentación teórica del alumno</h2>' + conclHtml +
+
+'<h2>3. Síntesis de conceptos abordados</h2>' +
+'<p style="font-family:Calibri,Arial;font-size:11pt;line-height:1.5;text-align:justify">' +
+'La flexibilidad algorítmica se sacrifica para alcanzar el rendimiento absoluto. Mientras la CPU de propósito general ' +
+'ejecuta cualquier instrucción con un sobrecosto energético por ciclo de reloj, la GPU optimiza el procesamiento ' +
+'paralelo y el ASIC graba el algoritmo directamente en la geometría del hardware: cero sobrecosto de decodificación. ' +
+'El ecosistema ASIC se despliega en cuatro nichos de alta densidad: aceleración de IA/ML (matrices MAC, topología de ' +
+'toroide 3D, memoria HBM), infraestructura de redes (conmutación monolítica Leaf/Spine medida en Tbps), seguridad ' +
+'criptográfica (motores de hardware fijo para offload, medidos en Gbps) y minería de criptomonedas (lógica SHA-256 ' +
+'repetitiva, medida en J/TH).</p>' +
+
+'<div class="foot">' +
+'Documento generado automáticamente por el Simulador de ASICs · Hardware III · 5.º año.<br>' +
+'Comprobante de entrega para Google Classroom y respaldo de la carpeta física.' +
+'</div>' +
+
+'</body></html>';
+
+  const nombreArchivo = 'Informe_HardwareIII_' +
+    (estado.nombre || 'Alumno').replace(/[^\wáéíóúÁÉÍÓÚñÑ]+/g,'_') + '_' +
+    (estado.curso || '').replace(/[^\wáéíóúÁÉÍÓÚñÑ]+/g,'_') + '.doc';
+
+  const blob = new Blob(['\ufeff', doc], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombreArchivo;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+
+  setTimeout(function(){
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 1500);
+}
+
+/* =========================================================
+   UTILIDADES
+   ========================================================= */
+function escapar(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
